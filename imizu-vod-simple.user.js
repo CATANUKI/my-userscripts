@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         いみずVOD 古い順再生
 // @namespace    https://github.com/CATANUKI/my-userscripts
-// @version      1.1.0
+// @version      1.2.0
 // @description  一覧ページの動画を古い順に開き、次の動画へ進みます
 // @match        https://imizu-vod.com/*
 // @match        https://www.imizu-vod.com/*
@@ -127,23 +127,38 @@
     location.href = data.playlist[nextIndex];
   }
 
-  function startOldestFirst() {
-    const links = getVideoLinks();
+ function startPlaylist(order) {
+  const links = getVideoLinks();
 
-    if (links.length === 0) {
-      alert('動画リンクを取得できませんでした。');
-      return;
-    }
-
-    /*
-     * 一覧が新しい順なので、順番を反転します。
-     * 対象は現在表示している一覧ページ内の動画だけです。
-     */
-    links.reverse();
-
-    savePlaylist(links);
-    location.href = links[0];
+  if (links.length === 0) {
+    alert('動画リンクを取得できませんでした。');
+    return;
   }
+
+  /*
+   * サイトの一覧は新しい動画から古い動画の順です。
+   *
+   * oldest：
+   * 配列を反転して、古い動画から新しい動画へ進みます。
+   *
+   * newest：
+   * 一覧の並びをそのまま使い、新しい動画から古い動画へ進みます。
+   */
+  if (order === 'oldest') {
+    links.reverse();
+  }
+
+  savePlaylist(links);
+  location.href = links[0];
+}
+
+function startOldestFirst() {
+  startPlaylist('oldest');
+}
+
+function startNewestFirst() {
+  startPlaylist('newest');
+}
 
   function createPanel(title) {
     document.getElementById(PANEL_ID)?.remove();
@@ -257,14 +272,25 @@
 
     const panel = createPanel('いみずVOD 古い順再生');
 
-    addText(
-      panel,
-      '現在のページにある動画' +
-        links.length +
-        '本を、古い動画から順番に開きます。'
-    );
+   addText(
+  panel,
+  '現在のページにある動画' +
+    links.length +
+    '本を、古い順または新しい順に再生できます。'
+);
+    addButton(
+  panel,
+  '古い動画から再生する',
+  startOldestFirst,
+  false
+);
 
-    addButton(panel, '古い順に再生する', startOldestFirst, false);
+addButton(
+  panel,
+  '新しい動画から再生する',
+  startNewestFirst,
+  false
+);
   }
 
   function showVideoPanel() {
