@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         いみずVOD 古い順再生
 // @namespace    https://github.com/CATANUKI/my-userscripts
-// @version      1.0.0
+// @version      1.1.0
 // @description  一覧ページの動画を古い順に開き、次の動画へ進みます
 // @match        https://imizu-vod.com/*
 // @match        https://www.imizu-vod.com/*
@@ -301,4 +301,162 @@
   } else {
     showListPanel();
   }
+    /*
+   * 動画の再生速度を変更する機能
+   */
+  const SPEED_KEY = 'imizuVodPlaybackSpeed';
+  const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
+
+  function getSavedSpeed() {
+    const saved = Number(localStorage.getItem(SPEED_KEY) || '1');
+
+    if (SPEEDS.includes(saved)) {
+      return saved;
+    }
+
+    return 1;
+  }
+
+  function applyPlaybackSpeed(speed) {
+    document.querySelectorAll('video').forEach(function (video) {
+      try {
+        video.defaultPlaybackRate = speed;
+        video.playbackRate = speed;
+      } catch (error) {
+        console.log('再生速度を設定できませんでした', error);
+      }
+    });
+  }
+
+  function setPlaybackSpeed(speed) {
+    localStorage.setItem(SPEED_KEY, String(speed));
+    applyPlaybackSpeed(speed);
+    updateSpeedButtons(speed);
+  }
+
+  function updateSpeedButtons(selectedSpeed) {
+    document
+      .querySelectorAll('[data-imizu-speed]')
+      .forEach(function (button) {
+        const buttonSpeed = Number(button.dataset.imizuSpeed);
+        const selected = buttonSpeed === selectedSpeed;
+
+        button.style.background = selected ? '#e97800' : '#0878b9';
+        button.style.borderColor = selected ? '#c45f00' : '#0878b9';
+      });
+  }
+
+  function addSpeedControls() {
+    if (!isVideoPage()) {
+      return;
+    }
+
+    const panel = document.getElementById(PANEL_ID);
+
+    if (!panel || panel.querySelector('[data-imizu-speed-area]')) {
+      return;
+    }
+
+    const speedArea = document.createElement('div');
+    speedArea.dataset.imizuSpeedArea = '1';
+
+    speedArea.style.cssText = [
+      'margin-top:12px',
+      'padding-top:10px',
+      'border-top:1px solid #ccc'
+    ].join(';');
+
+    const title = document.createElement('div');
+    title.textContent = '再生速度';
+    title.style.cssText =
+      'margin-bottom:7px;font-size:14px;font-weight:700';
+
+    speedArea.appendChild(title);
+
+    const buttonArea = document.createElement('div');
+
+    buttonArea.style.cssText = [
+      'display:grid',
+      'grid-template-columns:repeat(3,1fr)',
+      'gap:6px'
+    ].join(';');
+
+    SPEEDS.forEach(function (speed) {
+      const button = document.createElement('button');
+
+      button.type = 'button';
+      button.dataset.imizuSpeed = String(speed);
+      button.textContent = speed + '倍';
+
+      button.style.cssText = [
+        'padding:9px 4px',
+        'border:1px solid #0878b9',
+        'border-radius:7px',
+        'background:#0878b9',
+        'color:#fff',
+        'font-size:14px',
+        'font-weight:700',
+        '-webkit-appearance:none'
+      ].join(';');
+
+      button.addEventListener('click', function () {
+        setPlaybackSpeed(speed);
+      });
+
+      buttonArea.appendChild(button);
+    });
+
+    speedArea.appendChild(buttonArea);
+    panel.appendChild(speedArea);
+
+    updateSpeedButtons(getSavedSpeed());
+  }
+
+  function connectPlaybackSpeed() {
+    const savedSpeed = getSavedSpeed();
+
+    function connect() {
+      document.querySelectorAll('video').forEach(function (video) {
+        applyPlaybackSpeed(savedSpeed);
+
+        if (video.dataset.imizuSpeedConnected === '1') {
+          return;
+        }
+
+        video.dataset.imizuSpeedConnected = '1';
+
+        /*
+         * プレイヤーが再生開始時に速度を1倍へ戻す場合に備え、
+         * 読み込み時と再生時に保存速度を再適用します。
+         */
+        video.addEventListener('loadedmetadata', function () {
+          applyPlaybackSpeed(getSavedSpeed());
+        });
+
+        video.addEventListener('play', function () {
+          applyPlaybackSpeed(getSavedSpeed());
+        });
+      });
+
+      addSpeedControls();
+    }
+
+    connect();
+
+    const speedObserver = new MutationObserver(connect);
+
+    speedObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+
+    /*
+     * 動画が少し遅れて表示される場合への対策
+     */
+    setTimeout(connect, 1000);
+    setTimeout(connect, 3000);
+    setTimeout(connect, 5000);
+  }
+
+  connectPlaybackSpeed();
 })();
